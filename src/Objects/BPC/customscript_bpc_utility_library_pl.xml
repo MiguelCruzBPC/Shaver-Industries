@@ -1,0 +1,92 @@
+<plugintype scriptid="customscript_bpc_utility_library_pl">
+  <deploymentmodel>ALLOW_MULTIPLE</deploymentmodel>
+  <description>A utility library containing common JS / NS functions</description>
+  <documentationfile></documentationfile>
+  <isinactive>F</isinactive>
+  <loglevel>ERROR</loglevel>
+  <name>BPC | Utility Library | PL</name>
+  <notifyadmins>F</notifyadmins>
+  <notifyemails></notifyemails>
+  <notifyowner>T</notifyowner>
+  <notifyuser>F</notifyuser>
+  <scriptfile>[/SuiteScripts/BPC/bpc_utility_library_pl.js]</scriptfile>
+  <status>RELEASED</status>
+  <methods>
+    <method>
+      <description>Converts string to integer</description>
+      <method>forceInt</method>
+    </method>
+    <method>
+      <description>Convert string to float</description>
+      <method>forceFloat</method>
+    </method>
+    <method>
+      <description>Remove duplicate from array</description>
+      <method>uniq</method>
+    </method>
+    <method>
+      <description>Replace string</description>
+      <method>replaceCharAt</method>
+    </method>
+    <method>
+      <description>Insert string at position</description>
+      <method>insertStringAt</method>
+    </method>
+    <method>
+      <description>Round number and add curr</description>
+      <method>formatCurrency</method>
+    </method>
+    <method>
+      <description>Round decimal and add perc</description>
+      <method>formatPercent</method>
+    </method>
+    <method>
+      <description>Roudn decimal</description>
+      <method>round</method>
+    </method>
+    <method>
+      <description>Item type to internal id</description>
+      <method>toItemInternalId</method>
+    </method>
+    <method>
+      <description>Get base price of item</description>
+      <method>getItemPrice</method>
+    </method>
+    <method>
+      <description>Returns more than 1000 results</description>
+      <method>getAllSearchResults</method>
+    </method>
+    <method>
+      <description>Returns if today is weekend</description>
+      <method>isWeekend</method>
+    </method>
+    <method>
+      <description>Return last date from array</description>
+      <method>getLatestDate</method>
+    </method>
+    <method>
+      <description>Return earliest date from arr</description>
+      <method>getEarliestDate</method>
+    </method>
+    <method>
+      <description>Return first dat of month</description>
+      <method>getFirstDayInCurrent</method>
+    </method>
+    <method>
+      <description>Return last day of month</description>
+      <method>getLastDayInCurrent</method>
+    </method>
+    <method>
+      <description>Server Side delay</description>
+      <method>setTimeout</method>
+    </method>
+    <method>
+      <description>MR Error Handler</description>
+      <method>handleErrorMR</method>
+    </method>
+    <method>
+      <description>Get Query Results</description>
+      <method>getQueryResults</method>
+    </method>
+  </methods>
+</plugintype>

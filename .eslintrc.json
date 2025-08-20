@@ -1,0 +1,43 @@
+{
+  "env": {
+    "browser": true,
+    "commonjs": true,
+    "es6": true,
+    "node": false
+  },
+  "extends": ["airbnb-base", "plugin:prettier/recommended"],
+  "plugins": ["prettier"],
+  "overrides": [],
+  "globals": {
+    "define": true,
+    "log": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "script"
+  },
+  "rules": {
+    "no-plusplus": 0,
+    "import/no-amd": 0,
+    "func-names": 0,
+    "comma-dangle": ["error", "never"],
+    "linebreak-style": 0,
+    "prefer-template": 0,
+    "vars-on-top": 0,
+    "no-use-before-define": 0,
+    "consistent-return": ["error", { "treatUndefinedAsUnspecified": true }],
+    "eqeqeq": 2,
+    "no-template-curly-in-string": 0,
+    "no-continue": 0,
+    "padding-line-between-statements": [
+      "error",
+      { "blankLine": "always", "prev": "block-like", "next": "*" },
+      { "blankLine": "always", "prev": "block", "next": "*" }
+    ],
+    "max-len": ["error", { "ignoreComments": true, "code": 200 }],
+    "guard-for-in": "error",
+    "no-restricted-syntax": ["error", "LabeledStatement", "WithStatement"],
+    "camelcase": "off",
+    "no-case-declarations": "off"
+  }
+}
