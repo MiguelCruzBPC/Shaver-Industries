@@ -2,10 +2,10 @@
  * @NApiVersion 2.1
  * @NScriptType UserEventScript
  */
-define(['N/record', 'N/search'], /**
+define(['N/record', 'N/runtime'], /**
  * @param{record} record
- * @param{search} search
- */ (record, search) => {
+ * @param{runtime} runtime
+ */ (record, runtime) => {
   /**
    * Defines the function definition that is executed after record is submitted.
    * @param {Object} scriptContext
@@ -29,8 +29,34 @@ define(['N/record', 'N/search'], /**
           details: triggerSOInfo
         });
         if (triggerSOInfo && triggerSOInfo.arrayLineItem.length) {
+          // Get the value of Paired internal ID from script parameter
+          const intercompanyPairedStatus = runtime
+            .getCurrentScript()
+            .getParameter({ name: 'custscript_bpc_inter_status_paired' });
+
           // Create the sales order intercompany
-          createInterSOTransaction(triggerSOInfo);
+          const soIdCreated = createInterTransaction(triggerSOInfo, 'salesorder');
+          if (soIdCreated) {
+            // Create the purchase order
+            const poIdCreated = createInterTransaction(
+              triggerSOInfo,
+              'purchaseorder',
+              soIdCreated,
+              intercompanyPairedStatus
+            );
+
+            if (poIdCreated) {
+              // Set the sales order value in the Paired Intercompany Transaction
+              record.submitFields({
+                type: record.Type.SALES_ORDER,
+                id: poIdCreated,
+                values: {
+                  intercotransaction: poIdCreated,
+                  intercostatus: intercompanyPairedStatus
+                }
+              });
+            }
+          }
         }
       }
     } catch (e) {
@@ -41,21 +67,51 @@ define(['N/record', 'N/search'], /**
     }
   };
 
-  const createInterSOTransaction = (triggerSOInfo) => {
+  /** This function allow the creation of sales order and purchase order intercompany transactions* */
+  const createInterTransaction = (
+    triggerSOInfo,
+    typeTransaction,
+    soIdCreated,
+    intercompanyPairedStatus
+  ) => {
     // Create the Sales Order
     const soRecord = record.create({
-      type: record.Type.SALES_ORDER,
+      type: typeTransaction,
       isDynamic: true
     });
 
     // Set main body fields
-    // Customer
-    soRecord.setValue({
-      fieldId: 'entity',
-      value: triggerSOInfo.customer
-    });
+    // Vendor for Purchase Order or Customer for Sales Order
+    if (typeTransaction === 'salesorder') {
+      soRecord.setValue({
+        fieldId: 'entity',
+        value: triggerSOInfo.customer
+      });
+    } else {
+      // Set the Vendor
+      soRecord.setValue({
+        fieldId: 'entity',
+        value: 314 // Vendor: IC-Shaver Industries Inc
+      });
 
-    // Start Date
+      if (intercompanyPairedStatus) {
+        // Set the intercompany status as Paired
+        soRecord.setValue({
+          fieldId: 'intercostatus',
+          value: intercompanyPairedStatus // Paired
+        });
+      }
+
+      // Set the Paired Intercompany Transaction field in the PURCHASE ORDER
+      if (soIdCreated) {
+        soRecord.setValue({
+          fieldId: 'intercotransaction',
+          value: soIdCreated
+        });
+      }
+    }
+
+    // Start Date - TODO
     soRecord.setValue({
       fieldId: 'trandate',
       value: new Date()
@@ -126,14 +182,12 @@ define(['N/record', 'N/search'], /**
     }
 
     // Save the Sales Order
-    const soId = soRecord.save({
-      enableSourcing: true,
-      ignoreMandatoryFields: false
-    });
+    const transactionID = soRecord.save();
     log.debug({
-      title: 'Created Sales Order',
-      details: soId
+      title: 'Transaction ' + typeTransaction + ' Created',
+      details: transactionID
     });
+    return transactionID;
   };
 
   const getSOTriggerData = (triggerSORec) => {
