@@ -16,46 +16,48 @@ define(['N/record', 'N/runtime'], /**
    */
   const afterSubmit = (scriptContext) => {
     try {
-      // Get the sales order ID
-      const soId = scriptContext.newRecord.id;
+      // Get the purchase order ID
+      const poID = scriptContext.newRecord.id;
 
       // get the sales order rec
-      const triggerSORec = scriptContext.newRecord;
-      if (soId) {
+      const interPurchaseOrder = scriptContext.newRecord;
+      if (poID) {
         // Get the triggered sales order record
-        const triggerSOInfo = getSOTriggerData(triggerSORec);
+        const salesOrdCustomerData = getSOTriggerData(interPurchaseOrder);
         log.debug({
-          title: 'triggerSOInfo',
-          details: triggerSOInfo
+          title: 'salesOrdCustomerData',
+          details: salesOrdCustomerData
         });
-        if (triggerSOInfo && triggerSOInfo.arrayLineItem.length) {
+
+        // Validate if the customer sales order has data for the intercompany creation
+        if (salesOrdCustomerData && salesOrdCustomerData.arrayLineItem.length) {
           // Get the value of Paired internal ID from script parameter
           const intercompanyPairedStatus = runtime
             .getCurrentScript()
             .getParameter({ name: 'custscript_bpc_inter_status_paired' });
 
           // Create the sales order intercompany
-          const soIdCreated = createInterTransaction(triggerSOInfo, 'salesorder');
+          const soIdCreated = createInterTransaction(
+            salesOrdCustomerData,
+            intercompanyPairedStatus,
+            poID
+          );
           if (soIdCreated) {
-            // Create the purchase order
-            const poIdCreated = createInterTransaction(
-              triggerSOInfo,
-              'purchaseorder',
-              soIdCreated,
-              intercompanyPairedStatus
-            );
+            // Get the approval status from parameters to update the intercompany purchase order
+            const approvalStatusApproved = runtime
+              .getCurrentScript()
+              .getParameter({ name: 'custscript_bpc_approval_status' });
 
-            if (poIdCreated) {
-              // Set the sales order value in the Paired Intercompany Transaction
-              record.submitFields({
-                type: record.Type.SALES_ORDER,
-                id: poIdCreated,
-                values: {
-                  intercotransaction: poIdCreated,
-                  intercostatus: intercompanyPairedStatus
-                }
-              });
-            }
+            // Update the intercompany purchase order
+            record.submitFields({
+              type: record.Type.PURCHASE_ORDER,
+              id: poID,
+              values: {
+                intercotransaction: soIdCreated,
+                intercostatus: intercompanyPairedStatus,
+                approvalstatus: approvalStatusApproved
+              }
+            });
           }
         }
       }
@@ -68,47 +70,40 @@ define(['N/record', 'N/runtime'], /**
   };
 
   /** This function allow the creation of sales order and purchase order intercompany transactions* */
-  const createInterTransaction = (
-    triggerSOInfo,
-    typeTransaction,
-    soIdCreated,
-    intercompanyPairedStatus
-  ) => {
+  const createInterTransaction = (customerSalesOrderData, intercompanyPairedStatus, poID) => {
     // Create the Sales Order
     const soRecord = record.create({
-      type: typeTransaction,
+      type: record.Type.SALES_ORDER,
       isDynamic: true
     });
 
     // Set main body fields
-    // Vendor for Purchase Order or Customer for Sales Order
-    if (typeTransaction === 'salesorder') {
+    // hardcode customer - IC-Shaver Industries, LLC
+    const interSOcustomerId = runtime
+      .getCurrentScript()
+      .getParameter({ name: 'custscript_bpc_inter_so_customer' });
+
+    if (interSOcustomerId) {
       soRecord.setValue({
         fieldId: 'entity',
-        value: triggerSOInfo.customer
+        value: interSOcustomerId
       });
-    } else {
-      // Set the Vendor
+    }
+
+    if (intercompanyPairedStatus) {
+      // Set the intercompany status as Paired
       soRecord.setValue({
-        fieldId: 'entity',
-        value: 314 // Vendor: IC-Shaver Industries Inc
+        fieldId: 'intercostatus',
+        value: intercompanyPairedStatus // Paired
       });
+    }
 
-      if (intercompanyPairedStatus) {
-        // Set the intercompany status as Paired
-        soRecord.setValue({
-          fieldId: 'intercostatus',
-          value: intercompanyPairedStatus // Paired
-        });
-      }
-
-      // Set the Paired Intercompany Transaction field in the PURCHASE ORDER
-      if (soIdCreated) {
-        soRecord.setValue({
-          fieldId: 'intercotransaction',
-          value: soIdCreated
-        });
-      }
+    // Set the Paired Intercompany Transaction field in the PURCHASE ORDER
+    if (poID) {
+      soRecord.setValue({
+        fieldId: 'intercotransaction',
+        value: poID
+      });
     }
 
     // Start Date - TODO
@@ -120,24 +115,24 @@ define(['N/record', 'N/runtime'], /**
     // Lcoation
     soRecord.setValue({
       fieldId: 'location',
-      value: triggerSOInfo.location
+      value: customerSalesOrderData.location
     });
 
     // Department
     soRecord.setValue({
       fieldId: 'department',
-      value: triggerSOInfo.department
+      value: customerSalesOrderData.department
     });
 
     // PO Number
     soRecord.setValue({
       fieldId: 'otherrefnum',
-      value: triggerSOInfo.poNumber
+      value: customerSalesOrderData.poNumber
     });
 
     // Create the lines from the trigger sales order
-    if (triggerSOInfo.arrayLineItem.length > 0) {
-      for (let i = 0; i < triggerSOInfo.arrayLineItem.length; i++) {
+    if (customerSalesOrderData.arrayLineItem.length > 0) {
+      for (let i = 0; i < customerSalesOrderData.arrayLineItem.length; i++) {
         // Add an Item line
         soRecord.selectNewLine({ sublistId: 'item' });
 
@@ -145,35 +140,35 @@ define(['N/record', 'N/runtime'], /**
         soRecord.setCurrentSublistValue({
           sublistId: 'item',
           fieldId: 'item',
-          value: triggerSOInfo.arrayLineItem[i].itemId
+          value: customerSalesOrderData.arrayLineItem[i].itemId
         });
 
         // Item Quantity
         soRecord.setCurrentSublistValue({
           sublistId: 'item',
           fieldId: 'quantity',
-          value: triggerSOInfo.arrayLineItem[i].itemQty
+          value: customerSalesOrderData.arrayLineItem[i].itemQty
         });
 
         // Item Rate
         soRecord.setCurrentSublistValue({
           sublistId: 'item',
           fieldId: 'rate',
-          value: triggerSOInfo.arrayLineItem[i].itemRate
+          value: customerSalesOrderData.arrayLineItem[i].itemRate
         });
 
         // Item Location
         soRecord.setCurrentSublistValue({
           sublistId: 'item',
           fieldId: 'location',
-          value: triggerSOInfo.location
+          value: customerSalesOrderData.location
         });
 
         // Item Department
         soRecord.setCurrentSublistValue({
           sublistId: 'item',
           fieldId: 'department',
-          value: triggerSOInfo.arrayLineItem[i].itemDepartment
+          value: customerSalesOrderData.arrayLineItem[i].itemDepartment
         });
 
         // Commit the line
@@ -184,88 +179,107 @@ define(['N/record', 'N/runtime'], /**
     // Save the Sales Order
     const transactionID = soRecord.save();
     log.debug({
-      title: 'Transaction ' + typeTransaction + ' Created',
+      title: 'Intercompany sales Order Created',
       details: transactionID
     });
     return transactionID;
   };
 
-  const getSOTriggerData = (triggerSORec) => {
-    // validate if sales order is intercompany sales order.
-    // if intercompany fulfillment location has a value that means this sales order is the trigger so
-    const interFulfillmentLocation = triggerSORec.getValue({
-      fieldId: 'custbody_bpc_ic_location'
+  const getSOTriggerData = (interPurchaseOrder) => {
+    const createdfromSO = interPurchaseOrder.getValue({
+      fieldId: 'createdfrom'
     });
 
-    if (interFulfillmentLocation) {
-      // Get the header and line item information
-
-      // Get line information
-      const lineCount = triggerSORec.getLineCount({
-        sublistId: 'item'
+    // Get the value of intercompany status pending
+    const intercompanyStatus = runtime
+      .getCurrentScript()
+      .getParameter({ name: 'custscript_bpc_inter_status_pending' });
+    // Get the current intercompany status
+    const poInterStatus = interPurchaseOrder.getValue({
+      fieldId: 'intercostatus'
+    });
+    if (createdfromSO && Number(intercompanyStatus) === Number(poInterStatus)) {
+      // Load the customer sales order
+      const triggerSORec = record.load({
+        type: record.Type.SALES_ORDER,
+        id: createdfromSO,
+        isDynamic: true
       });
-      // Array with the item information
-      const arrayLineItem = [];
-      if (lineCount) {
-        for (let j = 0; j < lineCount; j++) {
-          const createPo = triggerSORec.getSublistValue({
-            sublistId: 'item',
-            fieldId: 'createpo',
-            line: j
-          });
-          if (createPo) {
-            arrayLineItem.push({
-              itemId: triggerSORec.getSublistValue({ sublistId: 'item', fieldId: 'item', line: j }),
-              itemQty: triggerSORec.getSublistValue({
-                sublistId: 'item',
-                fieldId: 'quantity',
-                line: j
-              }),
-              itemRate: triggerSORec.getSublistValue({
-                sublistId: 'item',
-                fieldId: 'rate',
-                line: j
-              }),
-              itemDepartment: triggerSORec.getSublistValue({
-                sublistId: 'item',
-                fieldId: 'department',
-                line: j
-              })
-            });
-          }
-        }
-      }
-
-      // Header information
-      const customer = triggerSORec.getValue({
-        fieldId: 'entity'
-      });
-      const trandate = triggerSORec.getValue({
-        fieldId: 'trandate'
-      });
-      const poNumber = triggerSORec.getValue({
-        fieldId: 'otherrefnum'
-      });
-      const subsidiary = triggerSORec.getValue({
-        fieldId: 'subsidiary'
-      });
-      const location = triggerSORec.getValue({
+      // Validate information in the sales order
+      const interFulfillmentLocation = triggerSORec.getValue({
         fieldId: 'custbody_bpc_ic_location'
       });
-      const department = triggerSORec.getValue({
-        fieldId: 'department'
-      });
 
-      // return the sales order information
-      return {
-        customer,
-        trandate,
-        poNumber,
-        subsidiary,
-        location,
-        department,
-        arrayLineItem
-      };
+      if (interFulfillmentLocation) {
+        // Get the header and line item information
+
+        // Get line information
+        const lineCount = triggerSORec.getLineCount({
+          sublistId: 'item'
+        });
+        // Array with the item information
+        const arrayLineItem = [];
+        if (lineCount) {
+          for (let j = 0; j < lineCount; j++) {
+            const createPo = triggerSORec.getSublistValue({
+              sublistId: 'item',
+              fieldId: 'createpo',
+              line: j
+            });
+            if (createPo) {
+              arrayLineItem.push({
+                itemId: triggerSORec.getSublistValue({
+                  sublistId: 'item',
+                  fieldId: 'item',
+                  line: j
+                }),
+                itemQty: triggerSORec.getSublistValue({
+                  sublistId: 'item',
+                  fieldId: 'quantity',
+                  line: j
+                }),
+                itemRate: triggerSORec.getSublistValue({
+                  sublistId: 'item',
+                  fieldId: 'rate',
+                  line: j
+                }),
+                itemDepartment: triggerSORec.getSublistValue({
+                  sublistId: 'item',
+                  fieldId: 'department',
+                  line: j
+                })
+              });
+            }
+          }
+        }
+
+        // Header information
+        const trandate = triggerSORec.getValue({
+          fieldId: 'trandate'
+        });
+        const poNumber = triggerSORec.getValue({
+          fieldId: 'otherrefnum'
+        });
+        const subsidiary = triggerSORec.getValue({
+          fieldId: 'subsidiary'
+        });
+        const location = triggerSORec.getValue({
+          fieldId: 'custbody_bpc_ic_location'
+        });
+        const department = triggerSORec.getValue({
+          fieldId: 'department'
+        });
+
+        // return the sales order information
+        return {
+          trandate,
+          poNumber,
+          subsidiary,
+          location,
+          department,
+          arrayLineItem
+        };
+      }
     }
 
     return false;
