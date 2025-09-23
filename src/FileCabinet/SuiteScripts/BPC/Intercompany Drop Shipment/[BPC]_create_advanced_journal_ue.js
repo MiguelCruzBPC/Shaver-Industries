@@ -17,46 +17,78 @@ define(['N/record', 'N/search', 'N/runtime'], /**
    */
   const afterSubmit = (scriptContext) => {
     try {
-      // Run only on creation
-      if (scriptContext.type !== scriptContext.UserEventType.CREATE) {
+      // Get the sales order ID
+      const soID = scriptContext.newRecord.id;
+      if (!soID) {
         return;
       }
 
+      // Run when the record is approved
+      const oldrecord = scriptContext.oldRecord;
       // Get the sales order record
       const soRecord = scriptContext.newRecord;
-      // Get the sales order ID
-      const soID = scriptContext.newRecord.id;
-      // Get the sales order information
-      const { arrayItemIds, arrayLineData, headerDataSO } = getSalesOrderData(soRecord);
-      if (arrayItemIds.length > 0) {
-        const itemVendorRates = getAllResultsPaged(getItemVendorRate(arrayItemIds));
+      // Get the new status and the old status
+      // New Status
+      const newStatus = soRecord.getValue({
+        fieldId: 'statusRef'
+      });
+      // Old Status
+      const oldStatus = oldrecord.getValue({
+        fieldId: 'statusRef'
+      });
 
-        // Get the total amount sales order
-        const totalAmounSO = getTotalVendorAmountSO(itemVendorRates, arrayLineData);
-        log.debug({
-          title: 'totalAmounSO',
-          details: totalAmounSO
-        });
+      // Load the sales order record (this is the record to update)
+      const soLoadRec = record.load({
+        type: record.Type.SALES_ORDER,
+        id: soID,
+        isDynamic: true
+      });
+      // Get the status
+      const soLoadedStatus = soLoadRec.getValue({
+        fieldId: 'statusRef'
+      });
 
-        if (Number(totalAmounSO) > 0) {
-          // Create the Advanced Intercompany Journal Entry
-          const advInterJournalEntryID = createJournalEntry(totalAmounSO, headerDataSO.subsidiary);
+      // this if validates that logic runs only when the button "Approve" is clicked.
+      if (
+        oldStatus === 'pendingApproval' &&
+        newStatus === 'pendingApproval' &&
+        soLoadedStatus === 'pendingFulfillment'
+      ) {
+        // Get the sales order information
+        const { arrayItemIds, arrayLineData, headerDataSO } = getSalesOrderData(soRecord);
+        if (arrayItemIds.length > 0) {
+          const itemVendorRates = getAllResultsPaged(getItemVendorRate(arrayItemIds));
+
+          // Get the total amount sales order
+          const totalAmounSO = getTotalVendorAmountSO(itemVendorRates, arrayLineData);
           log.debug({
-            title: 'advInterJournalEntryID',
-            details: advInterJournalEntryID
+            title: 'totalAmounSO',
+            details: totalAmounSO
           });
-          if (advInterJournalEntryID && soID) {
-            // Submit the advanced intercompany JE in the sales order
-            record.submitFields({
-              type: record.Type.SALES_ORDER,
-              id: soID,
-              values: {
-                custbody_bpc_adv_inter_je: advInterJournalEntryID
-              }
+
+          if (Number(totalAmounSO) > 0) {
+            // Create the Advanced Intercompany Journal Entry
+            const advInterJournalEntryID = createJournalEntry(
+              totalAmounSO,
+              headerDataSO.subsidiary
+            );
+            log.debug({
+              title: 'advInterJournalEntryID',
+              details: advInterJournalEntryID
             });
+            if (advInterJournalEntryID && soID) {
+              // Submit the advanced intercompany JE in the sales order
+              soLoadRec.setValue({
+                fieldId: 'custbody_bpc_adv_inter_je',
+                value: advInterJournalEntryID
+              });
+            }
           }
         }
       }
+
+      // Save the sales order loaded
+      soLoadRec.save();
     } catch (e) {
       log.error({
         title: 'Error AfterSubmit',
@@ -100,14 +132,22 @@ define(['N/record', 'N/search', 'N/runtime'], /**
     addLineJournal(
       journalRec,
       'debit',
-      accInterPayables,
+      accInterCOGS,
       totalAmounSO,
       subsidiaryLLC,
       subsidiaryInc,
       interVendorInc
     );
     // Credit line
-    addLineJournal(journalRec, 'credit', accInterCOGS, totalAmounSO, subsidiaryLLC, subsidiaryInc);
+    addLineJournal(
+      journalRec,
+      'credit',
+      accInterPayables,
+      totalAmounSO,
+      subsidiaryLLC,
+      subsidiaryInc,
+      interVendorInc
+    );
     // Debit line
     addLineJournal(
       journalRec,
@@ -125,7 +165,8 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       accInterIncome,
       totalAmounSO,
       subsidiaryInc,
-      subsidiaryLLC
+      subsidiaryLLC,
+      interVendorLLC
     );
 
     return journalRec.save();
