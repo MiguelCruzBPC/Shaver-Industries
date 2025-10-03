@@ -48,8 +48,17 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       if (soLoadedStatus === 'pendingFulfillment' && allowCrossSub && !advInterJournalEntry) {
         // Get the sales order information
         const { arrayItemIds, arrayLineData, headerDataSO } = getSalesOrderData(soLoadRec);
+        log.debug({
+          title: 'arrayItemIds',
+          details: arrayItemIds
+        });
+
         if (arrayItemIds.length > 0) {
           const itemVendorRates = getAllResultsPaged(getItemVendorRate(arrayItemIds));
+          log.debug({
+            title: 'itemVendorRates',
+            details: itemVendorRates
+          });
 
           // Get the total amount sales order
           const totalAmounSO = getTotalVendorAmountSO(itemVendorRates, arrayLineData);
@@ -250,12 +259,17 @@ define(['N/record', 'N/search', 'N/runtime'], /**
   };
 
   const getItemVendorRate = (arrayItemIds) => {
+    // Get the vendor ID from parameter
+    const scriptObj = runtime.getCurrentScript();
+    const vendorId = scriptObj.getParameter({ name: 'custscript_bpc_inter_vendor' });
+
+    // saved search
     return search.create({
       type: 'item',
       filters: [
         ['internalid', 'anyof', arrayItemIds],
         'AND',
-        ['vendor.internalidnumber', 'equalto', '314']
+        ['vendor.internalidnumber', 'equalto', vendorId]
       ],
       columns: [
         search.createColumn({ name: 'vendorcost', label: 'Vendor Price' }),
