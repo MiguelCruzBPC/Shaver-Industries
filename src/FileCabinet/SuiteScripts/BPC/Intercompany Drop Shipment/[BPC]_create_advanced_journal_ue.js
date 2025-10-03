@@ -23,20 +23,6 @@ define(['N/record', 'N/search', 'N/runtime'], /**
         return;
       }
 
-      // Run when the record is approved
-      const oldrecord = scriptContext.oldRecord;
-      // Get the sales order record
-      const soRecord = scriptContext.newRecord;
-      // Get the new status and the old status
-      // New Status
-      const newStatus = soRecord.getValue({
-        fieldId: 'statusRef'
-      });
-      // Old Status
-      const oldStatus = oldrecord.getValue({
-        fieldId: 'statusRef'
-      });
-
       // Load the sales order record (this is the record to update)
       const soLoadRec = record.load({
         type: record.Type.SALES_ORDER,
@@ -48,14 +34,20 @@ define(['N/record', 'N/search', 'N/runtime'], /**
         fieldId: 'statusRef'
       });
 
+      // Get the allow cross subsidiary fulfillment field
+      const allowCrossSub = soLoadRec.getValue({
+        fieldId: 'iscrosssubtransaction'
+      });
+
+      // Get the Advanced Intercompany Journal Entry Link field
+      const advInterJournalEntry = soLoadRec.getValue({
+        fieldId: 'custbody_bpc_adv_inter_je'
+      });
+
       // this if validates that logic runs only when the button "Approve" is clicked.
-      if (
-        oldStatus === 'pendingApproval' &&
-        newStatus === 'pendingApproval' &&
-        soLoadedStatus === 'pendingFulfillment'
-      ) {
+      if (soLoadedStatus === 'pendingFulfillment' && allowCrossSub && !advInterJournalEntry) {
         // Get the sales order information
-        const { arrayItemIds, arrayLineData, headerDataSO } = getSalesOrderData(soRecord);
+        const { arrayItemIds, arrayLineData, headerDataSO } = getSalesOrderData(soLoadRec);
         if (arrayItemIds.length > 0) {
           const itemVendorRates = getAllResultsPaged(getItemVendorRate(arrayItemIds));
 
