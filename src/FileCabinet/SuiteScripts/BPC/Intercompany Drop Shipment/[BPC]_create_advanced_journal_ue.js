@@ -48,20 +48,8 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       if (soLoadedStatus === 'pendingFulfillment' && allowCrossSub && !advInterJournalEntry) {
         // Get the sales order information
         const { arrayItemIds, arrayLineData, headerDataSO } = getSalesOrderData(soLoadRec);
-        log.debug({
-          title: 'arrayItemIds',
-          details: arrayItemIds
-        });
-        log.debug({
-          title: 'arrayLineData',
-          details: arrayLineData
-        });
         if (arrayItemIds.length > 0) {
           const itemDataSearch = getAllResultsPaged(getItemFields(arrayItemIds));
-          log.debug({
-            title: 'itemDataSearch',
-            details: itemDataSearch
-          });
 
           // Get the total amount sales order
           const totalAmounSO = getTotalAmountSO(
@@ -73,7 +61,6 @@ define(['N/record', 'N/search', 'N/runtime'], /**
             title: 'totalAmounSO',
             details: totalAmounSO
           });
-          return;
 
           if (Number(totalAmounSO) > 0) {
             // Create the Advanced Intercompany Journal Entry
@@ -246,9 +233,14 @@ define(['N/record', 'N/search', 'N/runtime'], /**
   };
 
   const getTotalAmountSO = (itemDataSearch, arrayLineData, soSubsidiary) => {
+    // Get the subsidiary parameters
+    const scriptObj = runtime.getCurrentScript();
+    const subsidiaryInc = scriptObj.getParameter({ name: 'custscript_bpc_subsidiary_inc' }); // Shaver Industries Inc
+
     // Build a price map depending on the selected subsidiary in the sales order
     const priceMap = itemDataSearch.reduce((acc, item) => {
-      const price = Number(soSubsidiary) === 3 ? item.transferPrice : item.transferPriceLlc;
+      const price =
+        Number(soSubsidiary) === Number(subsidiaryInc) ? item.transferPrice : item.transferPriceLlc;
       acc[item.itemId] = price;
       return acc;
     }, {});
@@ -267,7 +259,8 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       filters: [['internalid', 'anyof', arrayItemIds]],
       columns: [
         search.createColumn({ name: 'internalid', label: 'ID' }),
-        search.createColumn({ name: 'transferprice', label: 'Transfer Type' })
+        search.createColumn({ name: 'transferprice', label: 'Transfer Price' }),
+        search.createColumn({ name: 'custitem1', label: 'Transfer Price LLC' })
       ]
     });
   };
@@ -281,7 +274,8 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       page.data.forEach((result) => {
         results.push({
           itemId: Number(result.getValue({ name: 'internalid' })),
-          transferPrice: parseFloat(result.getValue({ name: 'transferprice' }))
+          transferPrice: parseFloat(result.getValue({ name: 'transferprice' })),
+          transferPriceLlc: parseFloat(result.getValue({ name: 'custitem1' }))
         });
       });
     });
@@ -339,17 +333,22 @@ define(['N/record', 'N/search', 'N/runtime'], /**
             itemID,
             itemQty
           });
+
+          // Store the item ID as unique time
+          if (!arrayItemIds.includes(itemID)) {
+            arrayItemIds.push(itemID);
+          }
         } else if (subsidiaryLLC === headerDataSO.subsidiary && invSubsidiary === subsidiaryInc) {
           // Main Subsidiary = Shaver LLC
           arrayLineData.push({
             itemID,
             itemQty
           });
-        }
 
-        // Store the item ID as unique time
-        if (!arrayItemIds.includes(itemID)) {
-          arrayItemIds.push(itemID);
+          // Store the item ID as unique time
+          if (!arrayItemIds.includes(itemID)) {
+            arrayItemIds.push(itemID);
+          }
         }
       }
     }
