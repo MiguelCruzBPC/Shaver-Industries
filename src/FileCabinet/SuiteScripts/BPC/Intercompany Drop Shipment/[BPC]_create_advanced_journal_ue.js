@@ -52,20 +52,28 @@ define(['N/record', 'N/search', 'N/runtime'], /**
           title: 'arrayItemIds',
           details: arrayItemIds
         });
-
+        log.debug({
+          title: 'arrayLineData',
+          details: arrayLineData
+        });
         if (arrayItemIds.length > 0) {
-          const itemVendorRates = getAllResultsPaged(getItemVendorRate(arrayItemIds));
+          const itemDataSearch = getAllResultsPaged(getItemFields(arrayItemIds));
           log.debug({
-            title: 'itemVendorRates',
-            details: itemVendorRates
+            title: 'itemDataSearch',
+            details: itemDataSearch
           });
 
           // Get the total amount sales order
-          const totalAmounSO = getTotalVendorAmountSO(itemVendorRates, arrayLineData);
+          const totalAmounSO = getTotalAmountSO(
+            itemDataSearch,
+            arrayLineData,
+            headerDataSO.subsidiary
+          );
           log.debug({
             title: 'totalAmounSO',
             details: totalAmounSO
           });
+          return;
 
           if (Number(totalAmounSO) > 0) {
             // Create the Advanced Intercompany Journal Entry
@@ -237,43 +245,29 @@ define(['N/record', 'N/search', 'N/runtime'], /**
     });
   };
 
-  const getTotalVendorAmountSO = (itemVendorRates, arrayLineData) => {
-    // Build a map { itemId: vendorCost }
-    const vendorCostMap = itemVendorRates.reduce((acc, item) => {
-      acc[item.itemId] = Number(item.vendorCost);
+  const getTotalAmountSO = (itemDataSearch, arrayLineData, soSubsidiary) => {
+    // Build a price map depending on the selected subsidiary in the sales order
+    const priceMap = itemDataSearch.reduce((acc, item) => {
+      const price = Number(soSubsidiary) === 3 ? item.transferPrice : item.transferPriceLlc;
+      acc[item.itemId] = price;
       return acc;
     }, {});
 
-    // Enrich arrayLineData with vendorCost
-    const enrichedData = arrayLineData.map((line) => ({
-      ...line,
-      vendorCost: vendorCostMap[line.itemID] ?? null
-    }));
-
-    // Calculate total amount = sum(qty * vendorCost) where vendorCost exists
-    return (
-      enrichedData.reduce((sum, line) => {
-        return sum + (line.vendorCost !== null ? line.itemQty * line.vendorCost : 0);
-      }, 0) || null
-    );
+    // Calculate the total amount in the sales order
+    return arrayLineData.reduce((sum, line) => {
+      const price = priceMap[line.itemID] || 0;
+      return sum + line.itemQty * price;
+    }, 0);
   };
 
-  const getItemVendorRate = (arrayItemIds) => {
-    // Get the vendor ID from parameter
-    const scriptObj = runtime.getCurrentScript();
-    const vendorId = scriptObj.getParameter({ name: 'custscript_bpc_inter_vendor' });
-
+  const getItemFields = (arrayItemIds) => {
     // saved search
     return search.create({
       type: 'item',
-      filters: [
-        ['internalid', 'anyof', arrayItemIds],
-        'AND',
-        ['vendor.internalidnumber', 'equalto', vendorId]
-      ],
+      filters: [['internalid', 'anyof', arrayItemIds]],
       columns: [
-        search.createColumn({ name: 'vendorcost', label: 'Vendor Price' }),
-        search.createColumn({ name: 'internalid', label: 'ID' })
+        search.createColumn({ name: 'internalid', label: 'ID' }),
+        search.createColumn({ name: 'transferprice', label: 'Transfer Type' })
       ]
     });
   };
@@ -287,7 +281,7 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       page.data.forEach((result) => {
         results.push({
           itemId: Number(result.getValue({ name: 'internalid' })),
-          vendorCost: parseFloat(result.getValue({ name: 'vendorcost' }))
+          transferPrice: parseFloat(result.getValue({ name: 'transferprice' }))
         });
       });
     });
@@ -308,16 +302,14 @@ define(['N/record', 'N/search', 'N/runtime'], /**
     // Array to store the sales order data
     const arrayLineData = [];
 
+    // Get the subsidiary parameters
+    const scriptObj = runtime.getCurrentScript();
+    const subsidiaryLLC = scriptObj.getParameter({ name: 'custscript_bpc_subsidiary_llc' }); // Shaver Industries, LLC
+    const subsidiaryInc = scriptObj.getParameter({ name: 'custscript_bpc_subsidiary_inc' }); // Shaver Industries Inc
+
     if (soLineCount > 0) {
       // Get the sales order line information
       for (let i = 0; i < soLineCount; i++) {
-        // Get the inventory location
-        const invLocation = soRecord.getSublistValue({
-          sublistId: 'item',
-          fieldId: 'inventorylocation',
-          line: i
-        });
-
         // Get the inventory subsidiary
         const invSubsidiary = soRecord.getSublistValue({
           sublistId: 'item',
@@ -341,16 +333,23 @@ define(['N/record', 'N/search', 'N/runtime'], /**
           line: i
         });
 
-        if (invLocation && invSubsidiary) {
+        // Main Subsidiary = Shaver Inc
+        if (subsidiaryInc === headerDataSO.subsidiary && invSubsidiary === subsidiaryLLC) {
           arrayLineData.push({
             itemID,
             itemQty
           });
+        } else if (subsidiaryLLC === headerDataSO.subsidiary && invSubsidiary === subsidiaryInc) {
+          // Main Subsidiary = Shaver LLC
+          arrayLineData.push({
+            itemID,
+            itemQty
+          });
+        }
 
-          // Store the item ID as unique time
-          if (!arrayItemIds.includes(itemID)) {
-            arrayItemIds.push(itemID);
-          }
+        // Store the item ID as unique time
+        if (!arrayItemIds.includes(itemID)) {
+          arrayItemIds.push(itemID);
         }
       }
     }
