@@ -123,6 +123,9 @@ define(['N/record', 'N/search', 'N/runtime'], /**
     const interVendorLLC = scriptObj.getParameter({ name: 'custscript_bpc_vendor_llc' }); //	IC-Shaver Industries, LLC
     const subsidiaryLLC = scriptObj.getParameter({ name: 'custscript_bpc_subsidiary_llc' }); // Shaver Industries, LLC
     const subsidiaryInc = scriptObj.getParameter({ name: 'custscript_bpc_subsidiary_inc' }); // Shaver Industries Inc
+    const departmentJE = scriptObj.getParameter({ name: 'custscript_bpc_department_je' }); // Department
+    const locationLLC = scriptObj.getParameter({ name: 'custscript_bpc_location_llc' }); // Florida Usa
+    const locationInc = scriptObj.getParameter({ name: 'custscript_bpc_location_inc' }); // Location Inc
 
     // Debit line
     addLineJournal(
@@ -132,7 +135,9 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       totalAmounSO,
       subsidiaryLLC,
       subsidiaryInc,
-      interVendorInc
+      interVendorInc,
+      departmentJE,
+      locationLLC
     );
     // Credit line
     addLineJournal(
@@ -142,7 +147,9 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       totalAmounSO,
       subsidiaryLLC,
       subsidiaryInc,
-      interVendorInc
+      interVendorInc,
+      departmentJE,
+      locationLLC
     );
     // Debit line
     addLineJournal(
@@ -152,7 +159,9 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       totalAmounSO,
       subsidiaryInc,
       subsidiaryLLC,
-      interVendorLLC
+      interVendorLLC,
+      departmentJE,
+      locationInc
     );
     // Credit line
     addLineJournal(
@@ -162,7 +171,9 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       totalAmounSO,
       subsidiaryInc,
       subsidiaryLLC,
-      interVendorLLC
+      interVendorLLC,
+      departmentJE,
+      locationInc
     );
 
     return journalRec.save();
@@ -175,7 +186,9 @@ define(['N/record', 'N/search', 'N/runtime'], /**
     soAmount,
     subsidiary,
     dueToSubsidiary,
-    vendorId
+    vendorId,
+    departmentJE,
+    locationJE
   ) => {
     // ADD the new line DEBIT OR CREDIT
     journalRec.selectNewLine({
@@ -223,6 +236,24 @@ define(['N/record', 'N/search', 'N/runtime'], /**
         sublistId: 'line',
         fieldId: 'duetofromsubsidiary',
         value: dueToSubsidiary
+      });
+    }
+
+    // Department JE
+    if (departmentJE) {
+      journalRec.setCurrentSublistValue({
+        sublistId: 'line',
+        fieldId: 'department',
+        value: departmentJE
+      });
+    }
+
+    // Location JE
+    if (locationJE) {
+      journalRec.setCurrentSublistValue({
+        sublistId: 'line',
+        fieldId: 'location',
+        value: locationJE
       });
     }
 
