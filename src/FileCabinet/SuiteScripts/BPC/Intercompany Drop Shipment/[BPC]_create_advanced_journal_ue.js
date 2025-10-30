@@ -45,7 +45,15 @@ define(['N/record', 'N/search', 'N/runtime'], /**
       });
 
       // this if validates that logic runs only when the button "Approve" is clicked.
-      if (soLoadedStatus === 'pendingFulfillment' && allowCrossSub && !advInterJournalEntry) {
+      // Validate is the status is pending fulfillment, pending billing, billed  or pending billing/partially fulfilled
+      if (
+        (soLoadedStatus === 'pendingFulfillment' ||
+          soLoadedStatus === 'pendingBilling' ||
+          soLoadedStatus === 'fullyBilled' ||
+          soLoadedStatus === 'pendingBillingPartFulfilled') &&
+        allowCrossSub &&
+        !advInterJournalEntry
+      ) {
         // Get the sales order information
         const { arrayItemIds, arrayLineData, headerDataSO } = getSalesOrderData(soLoadRec);
         if (arrayItemIds.length > 0) {
