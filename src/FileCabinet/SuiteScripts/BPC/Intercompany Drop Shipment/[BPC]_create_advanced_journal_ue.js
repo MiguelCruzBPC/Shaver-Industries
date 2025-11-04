@@ -50,7 +50,8 @@ define(['N/record', 'N/search', 'N/runtime'], /**
         (soLoadedStatus === 'pendingFulfillment' ||
           soLoadedStatus === 'pendingBilling' ||
           soLoadedStatus === 'fullyBilled' ||
-          soLoadedStatus === 'pendingBillingPartFulfilled') &&
+          soLoadedStatus === 'pendingBillingPartFulfilled' ||
+          soLoadedStatus === 'closed') &&
         allowCrossSub &&
         !advInterJournalEntry
       ) {
