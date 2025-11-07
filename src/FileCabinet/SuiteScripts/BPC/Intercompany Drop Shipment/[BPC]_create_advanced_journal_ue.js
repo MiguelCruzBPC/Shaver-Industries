@@ -60,6 +60,15 @@ define(['N/record', 'N/search', 'N/runtime'], /**
         if (arrayItemIds.length > 0) {
           const itemDataSearch = getAllResultsPaged(getItemFields(arrayItemIds));
 
+          /* log.debug({
+            title: 'itemDataSearch',
+            details: itemDataSearch
+          });
+
+          log.debug({
+            title: 'arrayLineData',
+            details: arrayLineData
+          }); */
           // Get the total amount sales order
           const totalAmounSO = getTotalAmountSO(
             itemDataSearch,
