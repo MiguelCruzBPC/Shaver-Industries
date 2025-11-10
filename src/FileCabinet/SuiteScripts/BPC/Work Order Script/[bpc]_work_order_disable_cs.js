@@ -52,15 +52,22 @@ define(['N/log', 'N/record'], /**
 
   const updateStatusProperty = (scriptContext) => {
     const { currentRecord } = scriptContext;
-    const engRequired = currentRecord.getValue({
-      fieldId: 'custbody_bpc_engineering_required'
-    });
-    const engComplete = currentRecord.getValue({
-      fieldId: 'custbody_bpc_engineering_complete'
+    const assemblyItem = currentRecord.getValue({
+      fieldId: 'assemblyitem'
     });
     const orderStatusFieldId = 'orderstatus';
-    currentRecord.getField({ fieldId: orderStatusFieldId }).isDisabled =
-      engRequired && !engComplete;
+    if (assemblyItem) {
+      const engRequired = currentRecord.getValue({
+        fieldId: 'custbody_bpc_engineering_required'
+      });
+      const engComplete = currentRecord.getValue({
+        fieldId: 'custbody_bpc_engineering_complete'
+      });
+      currentRecord.getField({ fieldId: orderStatusFieldId }).isDisabled =
+        engRequired && !engComplete;
+    } else {
+      currentRecord.getField({ fieldId: orderStatusFieldId }).isDisabled = true;
+    }
   };
 
   return {
